@@ -103,7 +103,7 @@ const ScanMeal = ({
         textAlign="center"
         sx={{ mb: 3, maxWidth: '500px' }}
       >
-        Upload a food image to get instant nutritional insights
+        Upload a clear photo of food to get instant nutritional insights
       </Typography>
 
       <Paper
@@ -149,6 +149,9 @@ const ScanMeal = ({
             <CloudUploadIcon sx={{ fontSize: 40, color: 'primary.main' }} />
             <Typography variant="body2" sx={{ color: isDragActive ? 'primary.main' : 'text.secondary' }}>
               {isDragActive ? "Drop your food image here..." : "Drag and drop a food image here, or click to select"}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', mt: 1, display: 'block' }}>
+              📸 Please upload clear photos of food only (pizza, burger, salad, etc.)
             </Typography>
           </Box>
         )}
@@ -643,7 +646,34 @@ const App = () => {
       });
     } catch (err) {
       console.error('Error scanning food:', err);
-      showError(err.response?.data?.detail || 'Error processing image');
+      let errorMessage = 'Error processing image';
+      
+      if (err.response?.status === 503) {
+        errorMessage = 'AI models are not available. Please check server configuration.';
+      } else if (err.response?.status === 400) {
+        const detail = err.response?.data?.detail || 'Invalid image file. Please try a different image.';
+        
+        // Check if it's a food validation error
+        if (detail.includes("doesn't appear to be a food image") || 
+            detail.includes("food image") || 
+            detail.includes("Please upload a clear photo of food")) {
+          errorMessage = '🍽️ ' + detail;
+        } else if (detail.includes("too small") || detail.includes("too large")) {
+          errorMessage = '📏 ' + detail;
+        } else if (detail.includes("properly oriented")) {
+          errorMessage = '📐 ' + detail;
+        } else {
+          errorMessage = '❌ ' + detail;
+        }
+      } else if (err.response?.status === 500) {
+        errorMessage = 'Server error occurred. Please try again later.';
+      } else if (err.response?.data?.detail) {
+        errorMessage = err.response.data.detail;
+      } else if (err.code === 'NETWORK_ERROR' || !err.response) {
+        errorMessage = 'Cannot connect to server. Please make sure the backend is running.';
+      }
+      
+      showError(errorMessage);
       setImagePreview(null);
     } finally {
       setLoading(false);
